@@ -1,0 +1,10 @@
+# Core dependencies
+python-dotenv
+pypdf
+langchain
+langchain-community
+qdrant-client
+sentence-transformers
+nomic
+ollama
+pytest

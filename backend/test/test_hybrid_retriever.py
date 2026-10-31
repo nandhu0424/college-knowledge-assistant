@@ -1,0 +1,87 @@
+
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from ingestion.pdf_loader import extract_text_from_pdf
+from ingestion.cleaner import clean_text
+from ingestion.chunker import create_chunks
+
+from rag.retriever import search_documents
+from rag.bm25_retriever import create_bm25_index, search_bm25
+from rag.hybrid_retriever import reciprocal_rank_fusion
+
+
+# 1. Load the sample PDF
+pdf_path = "data/sample/HS3151 Syllabus.pdf"
+
+pages = extract_text_from_pdf(pdf_path)
+
+
+# 2. Clean extracted text
+for page in pages:
+    page["text"] = clean_text(page["text"])
+
+
+# 3. Create chunks
+chunks = create_chunks(
+    pages,
+    chunk_size=1000,
+    overlap=150
+)
+
+
+# 4. Build BM25 index
+bm25 = create_bm25_index(chunks)
+
+
+# 5. Define query
+query = "What is HS3151?"
+
+
+# 6. Retrieve using semantic search
+semantic_results = search_documents(
+    query,
+    top_k=3
+)
+
+
+# 7. Retrieve using BM25
+bm25_results = search_bm25(
+    query=query,
+    chunks=chunks,
+    bm25=bm25,
+    top_k=3
+)
+
+
+# 8. Combine both rankings using RRF
+hybrid_results = reciprocal_rank_fusion(
+    semantic_results=semantic_results,
+    bm25_results=bm25_results,
+    k=60,
+    top_k=5
+)
+
+
+# 9. Display hybrid results
+print("\n================================")
+print("HYBRID SEARCH RESULTS (RRF)")
+print("================================")
+
+print("Query:", query)
+print("Total chunks:", len(chunks))
+print("Retrieved chunks:", len(hybrid_results))
+
+
+for rank, result in enumerate(hybrid_results, start=1):
+
+    print("\n----------------------------")
+    print("Rank:", rank)
+    print("Chunk ID:", result["chunk_id"])
+    print("Page:", result["page_number"])
+    print("RRF Score:", result["rrf_score"])
+
+    print("\nText:")
+    print(result["text"][:300])
